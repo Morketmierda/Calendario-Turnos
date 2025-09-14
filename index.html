@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Calendario de Turnos — Avanzado</title>
+  <style>
+    :root{
+      --bg:#f3f4f6; --card:#ffffff; --text:#0f172a; --muted:#6b7280; --accent:#2563eb;
+    }
+    [data-theme="dark"]{
+      --bg:#0f1724; --card:#0b1220; --text:#e6eef8; --muted:#9aa8bf; --accent:#60a5fa;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+      background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;
+    }
+    header{
+      display:flex;align-items:center;justify-content:space-between;padding:12px 14px;
+      background:var(--accent);color:white;font-weight:700;font-size:16px;
+    }
+    header .title{margin-left:6px}
+    header .right{display:flex;gap:8px;align-items:center}
+
+    nav{display:flex;background:transparent}
+    nav button{flex:1;padding:10px;border:0;background:transparent;font-weight:700;cursor:pointer}
+    nav button.active{background:var(--accent);color:white}
+
+    main{padding:10px}
+    .controls{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .controls .left{display:flex;gap:8px;align-items:center}
+    button.icon{border:0;background:#fff;padding:8px;border-radius:8px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.06)}
+    .monthLabel{font-weight:800}
+
+    .weekdays, #calendar{display:grid;grid-template-columns:repeat(7,1fr);max-width:100%}
+    .weekdays div{text-align:center;font-weight:800;padding:6px 0;font-size:12px;color:var(--muted)}
+    /* sábado = 6th and domingo = 7th -> style red */
+    .weekdays div:nth-child(6), .weekdays div:nth-child(7){ color:#ef4444; font-weight:900; }
+
+    #calendar{gap:6px;margin-top:8px}
+    .day{
+      min-height:88px;border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:6px;
+      background:var(--card);color:var(--text);position:relative;overflow:hidden;border:1px solid rgba(0,0,0,0.06);
+    }
+    .day.empty{background:transparent;border:0;min-height:40px}
+    .day-number{font-weight:800;font-size:14px}
+    .shift-label{
+      display:inline-block;padding:4px 6px;border-radius:8px;font-weight:700;color:white;font-size:12px;
+      max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .badges{display:flex;gap:6px;flex-wrap:wrap}
+    .badge{
+      background:rgba(255,255,255,0.2);padding:4px 6px;border-radius:6px;font-size:11px;font-weight:700;color:white;
+    }
+    .note{
+      width:100%;border:0;background:transparent;color:inherit;font-size:13px;padding:4px;margin-top:auto;resize:none;
+    }
+
+    /* small footer buttons */
+    .footer-actions{display:flex;gap:8px;margin-top:12px}
+    .small{font-size:13px;color:var(--muted)}
+
+    /* responsive mobile */
+    @media (max-width:420px){
+      .day{min-height:72px;padding:6px}
+      header{font-size:14px}
+    }
+
+    /* Stats modal basic */
+    .modal {
+      position:fixed;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;
+      background:rgba(0,0,0,0.45);z-index:1000;
+    }
+    .modal .card{
+      background:var(--card);color:var(--text);padding:16px;border-radius:12px;max-width:520px;width:92%;box-shadow:0 10px 40px rgba(0,0,0,0.4)
+    }
+    .modal .row{display:flex;justify-content:space-between;margin:8px 0}
+  </style>
+</head>
+<body data-theme="light">
+  <header>
+    <div class="left">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:34px;height:34px;border-radius:8px;background:#fff;color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:800">S</div>
+        <div class="title">Calendario Turnos</div>
+      </div>
+    </div>
+    <div class="right">
+      <button id="btnTheme" class="icon" title="Dark mode">🌙</button>
+      <button id="btnStats" class="icon" title="Informe">📊</button>
+    </div>
+  </header>
+
+  <nav>
+    <button id="tabCalendar" class="active">Calendario</button>
+    <button id="tabPatterns">Patrones</button>
+  </nav>
+
+  <main>
+    <!-- CALENDAR SCREEN -->
+    <section id="screenCalendar" class="screen active">
+      <div class="controls">
+        <div class="left">
+          <button id="prevBtn" class="icon">◀</button>
+          <button id="nextBtn" class="icon">▶</button>
+          <div class="monthLabel" id="monthLabel"></div>
+        </div>
+        <div>
+          <label style="font-weight:700"><input id="showInitial" type="checkbox"> Mostrar solo inicial</label>
+        </div>
+      </div>
+
+      <div class="weekdays">
+        <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div>Dom</div>
+      </div>
+
+      <div id="calendar"></div>
+
+      <div class="footer-actions">
+        <button id="btnAddVacation" style="flex:1;padding:10px;border-radius:8px;border:0;background:#ef4444;color:white">Añadir Vacaciones</button>
+        <button id="btnClearAll" style="flex:1;padding:10px;border-radius:8px;border:1px solid #e6e9ef;background:transparent">Borrar todo</button>
+      </div>
+    </section>
+
+    <!-- PATTERNS SCREEN -->
+    <section id="screenPatterns" class="screen" style="display:none">
+      <div style="background:var(--card);padding:12px;border-radius:12px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="patternName" placeholder="Nombre patrón (opcional)" style="flex:1;padding:8px;border-radius:8px;border:1px solid #e6e9ef">
+          <input id="patternLength" type="number" min="1" max="31" value="7" style="width:90px;padding:8px;border-radius:8px;border:1px solid #e6e9ef">
+          <button id="btnDefine" style="padding:8px;border-radius:8px;background:var(--accent);color:white;border:0">Definir</button>
+        </div>
+
+        <div id="patternInputs" style="margin-top:10px"></div>
+
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <input id="patternStart" type="date" style="flex:1;padding:8px;border-radius:8px;border:1px solid #e6e9ef">
+          <input id="patternRepeat" type="number" min="1" max="200" value="1" style="width:120px;padding:8px;border-radius:8px;border:1px solid #e6e9ef">
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button id="btnApply" style="flex:1;padding:10px;border-radius:8px;background:#10b981;color:white;border:0">Aplicar</button>
+          <button id="btnSave" style="flex:1;padding:10px;border-radius:8px;background:#2563eb;color:white;border:0">Guardar</button>
+        </div>
+
+        <div style="margin-top:12px">
+          <div style="font-weight:700;margin-bottom:6px">Patrones guardados</div>
+          <div id="savedPatterns"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Stats modal -->
+  <div id="modalStats" style="display:none" class="modal">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:800">Informe anual</div>
+        <button id="closeStats" class="icon">✖</button>
+      </div>
+      <div style="margin-top:12px">
+        <label>Año: <input id="statsYear" type="number" style="width:120px;padding:6px;border-radius:6px;border:1px solid #e6e9ef"></label>
+      </div>
+      <div id="statsContent" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+<script>
+/* ===========================
+   Estado y persistencia
+   =========================== */
+const STORAGE = {
+  SHIFTS: 'cal_turnos_shifts_v2',
+  NOTES: 'cal_turnos_notes_v2',
+  PATTERNS: 'cal_turnos_patterns_v2',
+  OVERTIME: 'cal_turnos_overtime_v2',
+  COURSES: 'cal_turnos_courses_v2',
+  VACATIONS: 'cal_turnos_vacations_v2'
+};
+
+let shifts = JSON.parse(localStorage.getItem(STORAGE.SHIFTS) || '{}'); // {date: {text,color}}
+let notes = JSON.parse(localStorage.getItem(STORAGE.NOTES) || '{}');   // {date: "note text"}
+let savedPatterns = JSON.parse(localStorage.getItem(STORAGE.PATTERNS) || '[]'); // [{name,seq}]
+let overtime = JSON.parse(localStorage.getItem(STORAGE.OVERTIME) || '{}'); // {date: hours}
+let courses = JSON.parse(localStorage.getItem(STORAGE.COURSES) || '{}'); // {date: [{start,end,hours,desc}]}
+let vacations = JSON.parse(localStorage.getItem(STORAGE.VACATIONS) || '[]'); // [{from,to}]
+
+function persistAll(){
+  localStorage.setItem(STORAGE.SHIFTS, JSON.stringify(shifts));
+  localStorage.setItem(STORAGE.NOTES, JSON.stringify(notes));
+  localStorage.setItem(STORAGE.PATTERNS, JSON.stringify(savedPatterns));
+  localStorage.setItem(STORAGE.OVERTIME, JSON.stringify(overtime));
+  localStorage.setItem(STORAGE.COURSES, JSON.stringify(courses));
+  localStorage.setItem(STORAGE.VACATIONS, JSON.stringify(vacations));
+}
+
+/* ===========================
+   Utilidades de fecha
+   =========================== */
+function pad(n){ return String(n).padStart(2,'0'); }
+function keyFromDate(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function dateFromKey(k){ const [y,m,d] = k.split('-').map(Number); return new Date(y,m-1,d); }
+
+/* ===========================
+   DOM referencias
+   =========================== */
+const tabCalendar = document.getElementById('tabCalendar');
+const tabPatterns = document.getElementById('tabPatterns');
+const screenCalendar = document.getElementById('screenCalendar');
+const screenPatterns = document.getElementById('screenPatterns');
+
+const monthLabel = document.getElementById('monthLabel');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const calendarEl = document.getElementById('calendar');
+const showInitial = document.getElementById('showInitial');
+const btnTheme = document.getElementById('btnTheme');
+const btnStats = document.getElementById('btnStats');
+const modalStats = document.getElementById('modalStats');
+const statsContent = document.getElementById('statsContent');
+const statsYear = document.getElementById('statsYear');
+const closeStats = document.getElementById('closeStats');
+
+const patternName = document.getElementById('patternName');
+const patternLength = document.getElementById('patternLength');
+const btnDefine = document.getElementById('btnDefine');
+const patternInputs = document.getElementById('patternInputs');
+const patternStart = document.getElementById('patternStart');
+const patternRepeat = document.getElementById('patternRepeat');
+const btnApply = document.getElementById('btnApply');
+const btnSave = document.getElementById('btnSave');
+const savedPatternsEl = document.getElementById('savedPatterns');
+
+const btnAddVacation = document.getElementById('btnAddVacation');
+const btnClearAll = document.getElementById('btnClearAll');
+
+/* ===========================
+   Estado de vista
+   =========================== */
+let viewDate = new Date(); viewDate.setDate(1);
+document.querySelector('body').dataset.theme = 'light';
+
+/* ===========================
+   Dark mode
+   =========================== */
+btnTheme.addEventListener('click', ()=>{
+  const body = document.querySelector('body');
+  body.dataset.theme = (body.dataset.theme === 'dark') ? 'light' : 'dark';
+  btnTheme.textContent = body.dataset.theme === 'dark' ? '☀' : '🌙';
+});
+
+/* ===========================
+   Tabs
+   =========================== */
+tabCalendar.addEventListener('click', ()=>{
+  tabCalendar.classList.add('active'); tabPatterns.classList.remove('active');
+  screenCalendar.style.display = ''; screenPatterns.style.display = 'none';
+});
+tabPatterns.addEventListener('click', ()=>{
+  tabPatterns.classList.add('active'); tabCalendar.classList.remove('active');
+  screenCalendar.style.display = 'none'; screenPatterns.style.display = '';
+  renderSavedPatterns();
+});
+
+/* ===========================
+   Render calendario
+   =========================== */
+function renderCalendar(){
+  calendarEl.innerHTML = '';
+  const y = viewDate.getFullYear(), m = viewDate.getMonth();
+  monthLabel.textContent = viewDate.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+
+  const first = new Date(y,m,1);
+  const last = new Date(y,m+1,0);
+  const days = last.getDate();
+  // monday=0
+  let start = (first.getDay() + 6) % 7;
+  for(let i=0;i<start;i++){
+    const empty = document.createElement('div'); empty.className='day empty'; calendarEl.appendChild(empty);
+  }
+
+  for(let d=1; d<=days; d++){
+    const date = new Date(y,m,d);
+    const key = keyFromDate(date);
+    const cell = document.createElement('div'); cell.className='day';
+    // if shift exists paint background
+    if(shifts[key]){
+      cell.style.background = shifts[key].color || '#2563eb';
+      // choose text color for contrast
+      const lum = luminanceFromHex(shifts[key].color || '#2563eb');
+      if(lum < 0.5) cell.style.color = '#ffffff'; else cell.style.color = '#0f172a';
+    } else {
+      cell.style.background = 'var(--card)';
+      cell.style.color = 'var(--text)';
+    }
+
+    // day number
+    const num = document.createElement('div'); num.className='day-number'; num.textContent = d;
+    cell.appendChild(num);
+
+    // shift label (if present) - but since whole background colored, keep small pill as well
+    if(shifts[key]){
+      const lbl = document.createElement('div'); lbl.className='shift-label'; lbl.textContent = showInitial.checked ? shifts[key].text.charAt(0) : shifts[key].text;
+      // label background slightly darker/opaque depending on overall bg
+      lbl.style.background = shadeColor(shifts[key].color || '#2563eb', -10);
+      cell.appendChild(lbl);
+    }
+
+    // badges: overtime, course, vacation marker
+    const badges = document.createElement('div'); badges.className='badges';
+    // overtime
+    if(overtime[key]){
+      const b = document.createElement('div'); b.className='badge'; b.textContent = `+${overtime[key]}h`;
+      b.title = 'Horas extra';
+      badges.appendChild(b);
+    }
+    // courses
+    if(courses[key] && courses[key].length > 0){
+      courses[key].forEach(c=>{
+        const b = document.createElement('div'); b.className='badge'; b.textContent = `Curso ${c.hours}h`;
+        b.title = `${c.desc || 'Curso'} ${c.start} - ${c.end}`;
+        badges.appendChild(b);
+      });
+    }
+    // vacations
+    if(isDateInAnyVacation(date)){
+      const b = document.createElement('div'); b.className='badge'; b.textContent = `Vacaciones`;
+      b.title = 'Vacaciones';
+      badges.appendChild(b);
+      // override bg for vacation (lighter gray)
+      cell.style.background = '#9ca3af';
+      const lum = luminanceFromHex('#9ca3af');
+      cell.style.color = lum < 0.5 ? '#fff' : '#0f172a';
+    }
+
+    if(badges.children.length > 0) cell.appendChild(badges);
+
+    // note area (no placeholder text visible when empty)
+    const ta = document.createElement('textarea'); ta.className='note'; ta.rows = 2; ta.value = notes[key] || '';
+    ta.addEventListener('input', (e)=>{ notes[key] = e.target.value; persistAll(); });
+    cell.appendChild(ta);
+
+    // click opens action menu (prompt-based)
+    cell.addEventListener('click', (ev)=>{ ev.stopPropagation(); dayActions(key); });
+
+    calendarEl.appendChild(cell);
+  }
+}
+
+/* ===========================
+   Month navigation
+   =========================== */
+prevBtn.addEventListener('click', ()=>{ viewDate.setMonth(viewDate.getMonth()-1); renderCalendar(); });
+nextBtn.addEventListener('click', ()=>{ viewDate.setMonth(viewDate.getMonth()+1); renderCalendar(); });
+
+showInitial.addEventListener('change', renderCalendar);
+
+/* ===========================
+   Pattern builder
+   =========================== */
+btnDefine.addEventListener('click', createPatternInputs);
+function createPatternInputs(){
+  patternInputs.innerHTML = '';
+  const len = Math.max(1, Math.min(31, parseInt(patternLength.value || '1')));
+  for(let i=1;i<=len;i++){
+    const row = document.createElement('div'); row.style.display='flex'; row.style.gap='8px'; row.style.marginBottom='8px'; row.style.alignItems='center';
+    const lbl = document.createElement('div'); lbl.textContent = `Día ${i}`; lbl.style.width='64px'; lbl.style.fontWeight='700';
+    const txt = document.createElement('input'); txt.type='text'; txt.id=`p_text_${i}`; txt.placeholder='Mañana / Tarde / Noche / Descanso';
+    txt.style.flex='1'; txt.style.padding='8px'; txt.style.border='1px solid #e6e9ef'; txt.style.borderRadius='8px';
+    const color = document.createElement('input'); color.type='color'; color.id=`p_color_${i}`; color.value = defaultColor(i);
+    color.style.width='44px'; color.style.height='44px'; color.style.border='0'; color.style.padding='0'; color.style.borderRadius='8px';
+    row.appendChild(lbl); row.appendChild(txt); row.appendChild(color); patternInputs.appendChild(row);
+  }
+}
+function defaultColor(i){ const palette=['#2563eb','#10b981','#f59e0b','#7c3aed','#6b7280','#ef4444']; return palette[(i-1)%palette.length]; }
+
+btnApply.addEventListener('click', ()=>{
+  const len = Math.max(1, parseInt(patternLength.value || '0'));
+  if(!patternStart.value){ alert('Selecciona fecha de inicio'); return; }
+  const seq = [];
+  for(let i=1;i<=len;i++){
+    const t = document.getElementById(`p_text_${i}`)?.value?.trim() || 'Descanso';
+    const c = document.getElementById(`p_color_${i}`)?.value || '#6b7280';
+    seq.push({text:t, color:c});
+  }
+  const start = new Date(patternStart.value + 'T00:00:00');
+  const reps = Math.max(1, parseInt(patternRepeat.value || '1'));
+  for(let r=0;r<reps;r++){
+    seq.forEach((item, idx)=>{
+      const d = new Date(start); d.setDate(start.getDate() + r*len + idx);
+      shifts[keyFromDate(d)] = {text: item.text, color: item.color};
+    });
+  }
+  persistAll(); renderCalendar(); alert('Patrón aplicado');
+});
+
+btnSave.addEventListener('click', ()=>{
+  const name = patternName.value.trim() || `Patrón ${savedPatterns.length+1}`;
+  const len = Math.max(1, parseInt(patternLength.value || '0'));
+  const seq = [];
+  for(let i=1;i<=len;i++){
+    const t = document.getElementById(`p_text_${i}`)?.value?.trim() || 'Descanso';
+    const c = document.getElementById(`p_color_${i}`)?.value || '#6b7280';
+    seq.push({text:t,color:c});
+  }
+  savedPatterns.push({name,seq}); persistAll(); renderSavedPatterns(); alert('Patrón guardado');
+});
+
+function renderSavedPatterns(){
+  savedPatternsEl.innerHTML = '';
+  if(savedPatterns.length === 0){ savedPatternsEl.innerHTML = '<div class="small">Sin patrones guardados</div>'; return; }
+  savedPatterns.forEach((p, idx)=>{
+    const row = document.createElement('div'); row.style.display='flex'; row.style.justifyContent='space-between'; row.style.alignItems='center'; row.style.marginBottom='8px';
+    const desc = document.createElement('div'); desc.innerHTML = `<div style="font-weight:800">${p.name}</div><div class="small">${p.seq.map(s=>s.text).join(' • ')}</div>`;
+    const actions = document.createElement('div');
+    actions.style.display='flex'; actions.style.gap='6px';
+    const btnA = document.createElement('button'); btnA.textContent='Aplicar'; btnA.style.padding='6px 8px'; btnA.style.borderRadius='8px'; btnA.style.background='#10b981'; btnA.style.color='white'; btnA.style.border='0';
+    btnA.addEventListener('click', ()=>{
+      const start = prompt('Fecha inicio (YYYY-MM-DD)', keyFromDate(new Date()));
+      if(!start) return;
+      const reps = parseInt(prompt('Repeticiones','1')||'1');
+      applySavedPattern(p.seq, new Date(start+'T00:00:00'), Math.max(1,reps));
+    });
+    const btnD = document.createElement('button'); btnD.textContent='Borrar'; btnD.style.padding='6px 8px';
+    btnD.addEventListener('click', ()=>{ if(confirm('Borrar patrón?')){ savedPatterns.splice(idx,1); persistAll(); renderSavedPatterns(); }});
+    actions.appendChild(btnA); actions.appendChild(btnD);
+    row.appendChild(desc); row.appendChild(actions); savedPatternsEl.appendChild(row);
+  });
+}
+function applySavedPattern(seq, startDate, reps){
+  for(let r=0;r<reps;r++){
+    seq.forEach((item, idx)=>{
+      const d = new Date(startDate); d.setDate(startDate.getDate() + r*seq.length + idx);
+      shifts[keyFromDate(d)] = {text:item.text, color:item.color};
+    });
+  }
+  persistAll(); renderCalendar(); alert('Patrón aplicado');
+}
+
+/* ===========================
+   Day actions (prompts)
+   =========================== */
+function dayActions(dateKey){
+  const actions = `Acciones para ${dateKey}:\n1) Editar turno\n2) Añadir/editar nota\n3) Añadir horas extra\n4) Anotar curso\n5) Cambiar turno\n6) Borrar turno/horas/curso\n0) Cancelar\n\nElige número:`;
+  const opt = prompt(actions, '1');
+  if(opt === null) return;
+  switch(opt.trim()){
+    case '1': editShiftPrompt(dateKey); break;
+    case '2': editNotePrompt(dateKey); break;
+    case '3': addOvertimePrompt(dateKey); break;
+    case '4': addCoursePrompt(dateKey); break;
+    case '5': changeShiftPrompt(dateKey); break;
+    case '6': deleteEntitiesPrompt(dateKey); break;
+    default: break;
+  }
+}
+
+/* Edit shift */
+function editShiftPrompt(key){
+  const cur = shifts[key] || {text:'',color:'#2563eb'};
+  const txt = prompt('Turno (vacío=eliminar):', cur.text);
+  if(txt === null) return;
+  if(txt.trim() === ''){ delete shifts[key]; persistAll(); renderCalendar(); return; }
+  const col = prompt('Color (hex) o deja vacío para color actual:', cur.color) || cur.color;
+  shifts[key] = {text: txt.trim(), color: col};
+  persistAll(); renderCalendar();
+}
+
+/* Note edit */
+function editNotePrompt(key){
+  const cur = notes[key] || '';
+  const txt = prompt('Nota rápida (vacío = eliminar):', cur);
+  if(txt === null) return;
+  if(txt.trim() === ''){ delete notes[key]; } else { notes[key] = txt.trim(); }
+  persistAll(); renderCalendar();
+}
+
+/* Overtime */
+function addOvertimePrompt(key){
+  const cur = overtime[key] || 0;
+  const val = prompt('Horas extra hoy (número, puede decimales). Vacío = quitar:', String(cur));
+  if(val === null) return;
+  if(val.trim() === ''){ delete overtime[key]; } else {
+    const num = parseFloat(val.replace(',', '.'));
+    if(isNaN(num)){ alert('Número inválido'); return; }
+    overtime[key] = num;
+  }
+  persistAll(); renderCalendar();
+}
+
+/* Courses */
+function addCoursePrompt(key){
+  const date = dateFromKey(key);
+  const desc = prompt('Descripción del curso (opcional):', 'Curso empresa');
+  if(desc === null) return;
+  const start = prompt('Hora inicio (HH:MM):', '09:00'); if(start === null) return;
+  const end = prompt('Hora fin (HH:MM):', '13:00'); if(end === null) return;
+  const h = hoursBetween(start, end);
+  if(h <= 0){ alert('Horas inválidas'); return; }
+  const arr = courses[key] || [];
+  arr.push({desc, start, end, hours: h});
+  courses[key] = arr;
+  persistAll(); renderCalendar();
+}
+
+/* Change shift (specific flow) */
+function changeShiftPrompt(key){
+  const cur = shifts[key] || {text:'Descanso', color:'#6b7280'};
+  const options = 'Indica nuevo turno (ej: Mañana, Tarde, Noche, Descanso):';
+  const txt = prompt(options, cur.text);
+  if(txt === null) return;
+  const col = prompt('Color para este nuevo turno (hex):', cur.color) || cur.color;
+  shifts[key] = {text: txt.trim(), color: col};
+  persistAll(); renderCalendar();
+}
+
+/* Delete entities */
+function deleteEntitiesPrompt(key){
+  const opt = prompt('Qué borrar? 1 Turno  2 Horas extra  3 Cursos  4 Nota  5 Todo', '5');
+  if(opt === null) return;
+  switch(opt.trim()){
+    case '1': delete shifts[key]; break;
+    case '2': delete overtime[key]; break;
+    case '3': delete courses[key]; break;
+    case '4': delete notes[key]; break;
+    case '5': delete shifts[key]; delete overtime[key]; delete courses[key]; delete notes[key]; break;
+    default: break;
+  }
+  persistAll(); renderCalendar();
+}
+
+/* ===========================
+   Vacations (range)
+   =========================== */
+btnAddVacation.addEventListener('click', ()=>{
+  const from = prompt('Vacaciones desde (YYYY-MM-DD):');
+  if(!from) return;
+  const to = prompt('Vacaciones hasta (YYYY-MM-DD):');
+  if(!to) return;
+  const start = new Date(from+'T00:00:00'), end = new Date(to+'T00:00:00');
+  if(isNaN(start) || isNaN(end) || end < start){ alert('Fechas inválidas'); return; }
+  vacations.push({from:keyFromDate(start), to:keyFromDate(end)});
+  persistAll(); renderCalendar(); alert('Vacaciones añadidas');
+});
+
+function isDateInAnyVacation(date){
+  const k = keyFromDate(date);
+  for(const v of vacations){
+    if(k >= v.from && k <= v.to) return true;
+  }
+  return false;
+}
+
+/* Clear all */
+btnClearAll.addEventListener('click', ()=>{
+  if(!confirm('Borrar todo (turnos, notas, horas extra, cursos, vacaciones)?')) return;
+  shifts = {}; notes = {}; overtime = {}; courses = {}; vacations = []; savedPatterns = [];
+  persistAll(); renderCalendar(); renderSavedPatterns();
+});
+
+/* ===========================
+   Courses helper
+   =========================== */
+function hoursBetween(h1, h2){
+  const [hA, mA] = (h1||'0:0').split(':').map(Number);
+  const [hB, mB] = (h2||'0:0').split(':').map(Number);
+  return Math.max(0, (hB + mB/60) - (hA + mA/60));
+}
+
+/* ===========================
+   Stats (annual)
+   =========================== */
+btnStats.addEventListener('click', ()=>{
+  modalStats.style.display = 'flex';
+  statsYear.value = new Date().getFullYear();
+  renderStats();
+});
+closeStats.addEventListener('click', ()=>{ modalStats.style.display = 'none'; });
+
+statsYear.addEventListener('change', renderStats);
+
+function renderStats(){
+  const year = parseInt(statsYear.value || new Date().getFullYear());
+  // counters
+  let normalHours = 0;
+  let overtimeHours = 0;
+  let courseHours = 0;
+  let vacationDays = 0;
+  // define default shift hour mapping
+  const map = {'Mañana':8,'Manana':8,'M':8,'Tarde':8,'Noche':8,'Descanso':0,'Vacaciones':0};
+  // iterate shifts
+  for(const k of Object.keys(shifts)){
+    const d = dateFromKey(k);
+    if(d.getFullYear() !== year) continue;
+    const text = shifts[k].text;
+    const hours = map[text] ?? 8; // default 8 if unknown
+    normalHours += hours;
+  }
+  // overtime
+  for(const k of Object.keys(overtime)){
+    const d = dateFromKey(k);
+    if(d.getFullYear() !== year) continue;
+    overtimeHours += Number(overtime[k] || 0);
+  }
+  // courses
+  for(const k of Object.keys(courses)){
+    const d = dateFromKey(k);
+    if(d.getFullYear() !== year) continue;
+    for(const c of courses[k]) courseHours += Number(c.hours || 0);
+  }
+  // vacations: count days per range in that year
+  for(const v of vacations){
+    let s = dateFromKey(v.from), e = dateFromKey(v.to);
+    // iterate days
+    for(let d=new Date(s); d<=e; d.setDate(d.getDate()+1)){
+      if(d.getFullYear()===year) vacationDays++;
+    }
+  }
+
+  const totalWorked = normalHours + overtimeHours + courseHours;
+  statsContent.innerHTML = `
+    <div class="row"><div>Horas normales (estimadas):</div><div style="font-weight:800">${normalHours.toFixed(2)} h</div></div>
+    <div class="row"><div>Horas extra:</div><div style="font-weight:800">${overtimeHours.toFixed(2)} h</div></div>
+    <div class="row"><div>Horas cursos:</div><div style="font-weight:800">${courseHours.toFixed(2)} h</div></div>
+    <div class="row"><div>Días vacaciones:</div><div style="font-weight:800">${vacationDays} días</div></div>
+    <hr />
+    <div class="row"><div>Total aproximado horas:</div><div style="font-weight:900">${totalWorked.toFixed(2)} h</div></div>
+  `;
+}
+
+/* ===========================
+   Helpers color / luminance
+   =========================== */
+function luminanceFromHex(hex){
+  if(!hex) return 0;
+  hex = hex.replace('#','');
+  const r = parseInt(hex.substring(0,2),16)/255;
+  const g = parseInt(hex.substring(2,4),16)/255;
+  const b = parseInt(hex.substring(4,6),16)/255;
+  const a = [r,g,b].map(v => (v <= 0.03928) ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4));
+  return 0.2126*a[0] + 0.7152*a[1] + 0.0722*a[2];
+}
+function shadeColor(hex, percent){
+  // percent -100..100
+  const f=parseInt(hex.slice(1),16),t=percent<0?0:255,p= Math.abs(percent)/100;
+  const R=f>>16,G=f>>8&0x00FF,B=f&0x0000FF;
+  const nr = Math.round((t - R)*p)+R;
+  const ng = Math.round((t - G)*p)+G;
+  const nb = Math.round((t - B)*p)+B;
+  return `rgb(${nr},${ng},${nb})`;
+}
+
+/* ===========================
+   Init
+   =========================== */
+(function init(){
+  // default pattern start today
+  document.getElementById('patternStart').value = (new Date()).toISOString().slice(0,10);
+  createPatternInputs();
+  renderSavedPatterns();
+  renderCalendar();
+  persistAll();
+})();
+
+</script>
+</body>
+</html>
